@@ -1,9 +1,57 @@
 #!/bin/bash
 
-#
-# Pre defined variables
-#
-uuid='05E1A73C04E337C0'
+# Nome do arquivo para salvar o UUID
+output_file="UUID.txt"
+
+lsblk -o NAME,SIZE,RO,FSTYPE,TYPE,MOUNTPOINT,UUID,PTUUID
+
+# Lista de partições disponíveis
+partitions=($(lsblk -o NAME,TYPE | grep 'part' | awk '{print $1}'))
+num_partitions=${#partitions[@]}
+
+# Verifique se há pelo menos uma partição
+if [ "$num_partitions" -eq 0 ]; then
+    echo "Nenhuma partição encontrada."
+    exit 1
+fi
+
+# Liste as partições disponíveis com números enumerados
+echo "Partições disponíveis:"
+for ((i = 0; i < num_partitions; i++)); do
+    echo "$((i + 1)). ${partitions[i]}"
+done
+
+# Peça ao usuário para escolher uma partição por número
+read -p "Digite o número da partição desejada (1-$num_partitions): " partition_number
+
+# Verifique se o número de partição é válido
+if ! [[ "$partition_number" =~ ^[0-9]+$ ]]; then
+    echo "Número de partição inválido."
+    exit 1
+fi
+
+# Verifique se o número de partição está dentro do intervalo válido
+if [ "$partition_number" -lt 1 ] || [ "$partition_number" -gt "$num_partitions" ]; then
+    echo "Número de partição fora do intervalo válido."
+    exit 1
+fi
+
+# Obtenha o nome da partição selecionada
+selected_partition="${partitions[$((partition_number - 1))]}"
+#echo "$selected_partition"
+selected_partition_cleaned=$(echo "$selected_partition" | sed 's/[└─├]//g')
+#echo "$selected_partition_cleaned"
+# Use o comando 'blkid' para obter o UUID da partição selecionada
+uuid=$(blkid -s UUID -o value /dev/"$selected_partition_cleaned") ################### UUID aqui!!!!!
+
+# Verifique se o UUID foi encontrado
+if [ -n "$uuid" ]; then
+    echo $uuid
+else
+    echo "Partição não encontrada ou UUID não disponível."
+fi
+
+
 BackupDir='/mnt/nextcloud_backup'
 NextcloudConfig='/var/www/nextcloud'
 NextcloudDataDir=$(sudo -u www-data $NextcloudConfig/occ config:system:get datadirectory)
